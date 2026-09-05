@@ -1,0 +1,7 @@
+node_modules/
+dist/
+JetKFlow-Desktop/
+JetKFlow-Windows/
+release/
+*.exe
+.DS_Store

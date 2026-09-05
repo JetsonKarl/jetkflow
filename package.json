@@ -1,0 +1,50 @@
+{
+  "name": "jetkflow",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview",
+    "desktop": "electron .",
+    "package:win": "pnpm build && electron-builder --win portable"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@supabase/supabase-js": "latest",
+    "@vitejs/plugin-react": "latest",
+    "electron": "^44.1.1",
+    "electron-builder": "^26.15.3",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "build": {
+    "appId": "com.jetkflow.desktop",
+    "productName": "JetKFlow",
+    "asar": true,
+    "compression": "maximum",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "JetKFlow-Desktop"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": "portable",
+      "artifactName": "JetKFlow-${version}-portable.${ext}"
+    }
+  }
+}
