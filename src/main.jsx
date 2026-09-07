@@ -17,6 +17,7 @@ const iso = (day, month = m, year = y) => `${year}-${pad(month + 1)}-${pad(day)}
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const todayKey = dateKey(now)
 const ALLOWED_EMAIL = 'zjyeoe@njust.edu.cn'
+const ALLOWED_PASSWORD = '19971011'
 const AUTH_DENIED_MESSAGE = '禁止注册/登录，请联系管理员。'
 const normalizeEmail = value => String(value || '').trim().toLowerCase()
 const isAllowedEmail = value => normalizeEmail(value) === ALLOWED_EMAIL
@@ -471,12 +472,24 @@ function LoginScreen({ initialError = '' }) {
   const [error, setError] = useState(initialError)
   useEffect(() => { if (initialError) setError(initialError) }, [initialError])
   const submit = async () => {
-    if (!isAllowedEmail(email)) { setError(AUTH_DENIED_MESSAGE); return }
-    if (!email.trim() || password.length < 6) { setError('请输入邮箱，密码至少 6 位'); return }
+    // 邮箱与密码必须与预设的账号完全一致，其余一律拒绝（注册与登录同一入口）
+    if (!isAllowedEmail(email) || password !== ALLOWED_PASSWORD) { setError(AUTH_DENIED_MESSAGE); return }
     setBusy(true); setError('')
-    const { error: err } = await cloud.auth.signInWithPassword({ email: normalizeEmail(email), password })
+    let { data, error: err } = await cloud.auth.signInWithPassword({ email: ALLOWED_EMAIL, password: ALLOWED_PASSWORD })
+    if (err) {
+      // 账号还没创建过：用预设凭据注册（项目已关闭邮箱验证，注册即登录）
+      const registered = await cloud.auth.signUp({ email: ALLOWED_EMAIL, password: ALLOWED_PASSWORD })
+      if (registered.error) {
+        setBusy(false)
+        setError(registered.error.message === 'User already registered'
+          ? '账号已存在但密码不匹配，请到 Supabase 后台重置密码'
+          : registered.error.message)
+        return
+      }
+      data = registered.data
+    }
     setBusy(false)
-    if (err) { setError(err.message === 'Invalid login credentials' ? '邮箱或密码不正确' : err.message); return }
+    if (!data?.session) setError('登录未生效，请稍后重试')
   }
   return <div className="auth-backdrop"><div className="auth-card">
     <div className="auth-mark"><Check/></div>

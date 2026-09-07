@@ -169,3 +169,17 @@ html.desktop-shell .top-add{right:158px}
   button{-webkit-tap-highlight-color:transparent}
   .bottom-nav{backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
 }
+
+/* —— 移动端关键修复 ——
+   .app-shell 的 backdrop-filter 会把它变成内部 position:fixed 元素（底部导航、
+   抽屉侧栏、遮罩）的定位基准；iOS 上 100vh 又大于实际可视高度（Safari 地址栏/
+   工具栏占位），两者叠加导致底部导航被定位到屏幕外"消失"。移动端关闭毛玻璃
+   并改用动态视口高度 dvh。 */
+@media(max-width:760px){
+  .app-shell{backdrop-filter:none;-webkit-backdrop-filter:none;height:100vh;height:100dvh}
+  /* iOS 在输入框字号 <16px 时聚焦会自动放大页面 */
+  .field input,.field textarea,.field select,.notes-search input,.editor-meta input,.command-input input,.setting-row select,.format-tools select{font-size:16px}
+  input[type="date"],input[type="time"]{min-height:40px}
+}
+/* 其余圆形元素同样锁定纵横比 */
+.brand-mark,.day-cell>span,.nav-section button i,.traffic i,.reminder-row .check{aspect-ratio:1;flex:0 0 auto}
