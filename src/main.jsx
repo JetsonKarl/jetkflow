@@ -482,7 +482,7 @@ function LoginScreen({ initialError = '' }) {
       if (registered.error) {
         setBusy(false)
         setError(registered.error.message === 'User already registered'
-          ? '账号已存在但密码不匹配，请到 Supabase 后台重置密码'
+          ? '账号已存在但密码不匹配：请在 Supabase 控制台 Authentication → Users 中删除该用户后重试'
           : registered.error.message)
         return
       }
