@@ -69,26 +69,49 @@ alter table public.lists    enable row level security;
 drop policy if exists own_data on public.reminders;
 create policy own_data on public.reminders
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn')
+  with check (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn');
 
 drop policy if exists own_data on public.events;
 create policy own_data on public.events
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn')
+  with check (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn');
 
 drop policy if exists own_data on public.notes;
 create policy own_data on public.notes
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn')
+  with check (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn');
 
 drop policy if exists own_data on public.lists;
 create policy own_data on public.lists
   for all to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn')
+  with check (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn');
+
+-- 注册白名单：创建函数后，还需在 Supabase 控制台 Authentication → Hooks 中
+-- 将 Before User Created 设置为 public.hook_restrict_jetkflow_signup。
+create or replace function public.hook_restrict_jetkflow_signup(event jsonb)
+returns jsonb
+language plpgsql
+as $$
+begin
+  if lower(coalesce(event->'user'->>'email', '')) <> 'zjyeoe@njust.edu.cn' then
+    return jsonb_build_object(
+      'error', jsonb_build_object(
+        'http_code', 403,
+        'message', '禁止注册/登录，请联系管理员。'
+      )
+    );
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+grant usage on schema public to supabase_auth_admin;
+grant execute on function public.hook_restrict_jetkflow_signup(jsonb) to supabase_auth_admin;
+revoke execute on function public.hook_restrict_jetkflow_signup(jsonb) from authenticated, anon, public;
 
 -- 实时推送（为以后多设备实时同步预留，无害）
 do $$

@@ -16,6 +16,10 @@ const pad = n => String(n).padStart(2, '0')
 const iso = (day, month = m, year = y) => `${year}-${pad(month + 1)}-${pad(day)}`
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const todayKey = dateKey(now)
+const ALLOWED_EMAIL = 'zjyeoe@njust.edu.cn'
+const AUTH_DENIED_MESSAGE = '禁止注册/登录，请联系管理员。'
+const normalizeEmail = value => String(value || '').trim().toLowerCase()
+const isAllowedEmail = value => normalizeEmail(value) === ALLOWED_EMAIL
 
 const seedReminders = [
   { id: 'r1', title: '准备季度复盘材料', date: todayKey, time: '10:00', list: '工作', color: '#ff9f0a', done: false, priority: true, notes: '整理关键进展与下季度目标' },
@@ -105,12 +109,12 @@ function useSyncedState(key, initial, config) {
       setValue(current => [...rows.map(config.fromRow), ...current.filter(item => !remoteIds.has(item.id))])
     }
     const { data: { subscription } } = cloud.auth.onAuthStateChange((_event, session) => {
-      sessionRef.current = session
-      if (session) pull()
+      sessionRef.current = session && isAllowedEmail(session.user?.email) ? session : null
+      if (sessionRef.current) pull()
     })
     cloud.auth.getSession().then(({ data }) => {
-      sessionRef.current = data.session
-      if (data.session) pull()
+      sessionRef.current = data.session && isAllowedEmail(data.session.user?.email) ? data.session : null
+      if (sessionRef.current) pull()
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -460,33 +464,31 @@ function BottomNav({ active, onNavigate }) {
   return <nav className="bottom-nav" aria-label="主要导航">{items.map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>onNavigate(item.id)}><Icon/><span>{item.label}</span></button>})}</nav>
 }
 
-function LoginScreen({ onLocal }) {
+function LoginScreen({ initialError = '' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const submit = async mode => {
+  const [error, setError] = useState(initialError)
+  useEffect(() => { if (initialError) setError(initialError) }, [initialError])
+  const submit = async () => {
+    if (!isAllowedEmail(email)) { setError(AUTH_DENIED_MESSAGE); return }
     if (!email.trim() || password.length < 6) { setError('请输入邮箱，密码至少 6 位'); return }
     setBusy(true); setError('')
-    const { error: err } = mode === 'signup'
-      ? await cloud.auth.signUp({ email: email.trim(), password })
-      : await cloud.auth.signInWithPassword({ email: email.trim(), password })
+    const { error: err } = await cloud.auth.signInWithPassword({ email: normalizeEmail(email), password })
     setBusy(false)
     if (err) { setError(err.message === 'Invalid login credentials' ? '邮箱或密码不正确' : err.message); return }
-    if (mode === 'signup') setError('注册请求已发送——若项目开启了邮箱验证，请先到邮箱点击确认链接')
   }
   return <div className="auth-backdrop"><div className="auth-card">
     <div className="auth-mark"><Check/></div>
     <h2>JetKFlow 云同步</h2>
     <p>登录后，提醒、日历与便笺在所有设备上保持一致</p>
-    <label className="field"><span>邮箱</span><input type="email" autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" onKeyDown={e => e.key === 'Enter' && submit('login')}/></label>
-    <label className="field"><span>密码</span><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 6 位" onKeyDown={e => e.key === 'Enter' && submit('login')}/></label>
+    <label className="field"><span>邮箱</span><input type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="请输入邮箱" onKeyDown={e => e.key === 'Enter' && submit()}/></label>
+    <label className="field"><span>密码</span><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" onKeyDown={e => e.key === 'Enter' && submit()}/></label>
     <div className="auth-actions">
-      <button className="auth-secondary" disabled={busy} onClick={() => submit('signup')}>注册</button>
-      <button className="auth-primary" disabled={busy} onClick={() => submit('login')}>登录</button>
+      <button className="auth-primary" disabled={busy} onClick={submit}>{busy ? '正在登录…' : '登录'}</button>
     </div>
-    {error && <p className="auth-error">{error}</p>}
-    <button className="auth-local" onClick={onLocal}>暂不登录，先在本地使用 →</button>
+    {error && <p className="auth-error" role="alert" aria-live="polite">{error}</p>}
+    <p className="auth-allowlist">仅授权账号可访问</p>
   </div></div>
 }
 
@@ -510,7 +512,7 @@ function App() {
   const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
   const [session, setSession] = useState(null)
   const [authReady, setAuthReady] = useState(!cloudReady)
-  const [localBypass, setLocalBypass] = useState(false)
+  const [authMessage, setAuthMessage] = useState('')
   const navigate = (view, id) => { setActive(view); if (id) setSelectedNote(id) }
   useEffect(() => { document.documentElement.dataset.density = settings.compact ? 'compact' : 'comfortable' }, [settings.compact])
   useEffect(() => {
@@ -528,11 +530,23 @@ function App() {
   }, [active])
   useEffect(() => {
     if (!cloud) return
-    cloud.auth.getSession().then(({ data }) => { setSession(data.session); setAuthReady(true) })
-    const { data: { subscription } } = cloud.auth.onAuthStateChange((_event, next) => { setSession(next); setAuthReady(true) })
+    const acceptSession = next => {
+      if (next && !isAllowedEmail(next.user?.email)) {
+        setAuthMessage(AUTH_DENIED_MESSAGE)
+        setSession(null)
+        setAuthReady(true)
+        void cloud.auth.signOut()
+        return
+      }
+      if (next) setAuthMessage('')
+      setSession(next)
+      setAuthReady(true)
+    }
+    cloud.auth.getSession().then(({ data }) => acceptSession(data.session))
+    const { data: { subscription } } = cloud.auth.onAuthStateChange((_event, next) => acceptSession(next))
     return () => subscription.unsubscribe()
   }, [])
-  const signOut = () => { cloud?.auth.signOut() }
+  const signOut = () => { setAuthMessage(''); cloud?.auth.signOut() }
   const addReminder = data => setReminders(rs => [{id:crypto.randomUUID(), list:'个人', color:'#0a84ff', done:false, priority:false, ...data}, ...rs])
   const addEvent = data => {
     const id=crypto.randomUUID(); let reminderId=null
@@ -560,6 +574,7 @@ function App() {
     checkDue(); const timer = setInterval(checkDue, 30000); return () => clearInterval(timer)
   }, [notificationPermission, reminders])
   useEffect(() => {
+    if (!session || !isAllowedEmail(session.user?.email)) return
     const context = document.modelContext
     if (!context?.registerTool) return
     const lifecycle = new AbortController()
@@ -611,14 +626,14 @@ function App() {
       }, { signal: lifecycle.signal })).catch(report)
     } catch (error) { report(error) }
     return () => lifecycle.abort()
-  }, [setReminders, setEvents, setNotes, reminders, events])
+  }, [session, setReminders, setEvents, setNotes, reminders, events])
   const results = useMemo(() => query ? [
     ...reminders.filter(r=>r.title.includes(query)).map(r=>({...r,type:'提醒事项',view:'reminders'})),
     ...events.filter(e=>e.title.includes(query)).map(e=>({...e,type:'日历',view:'calendar'})),
     ...notes.filter(n=>(n.title+n.content).includes(query)).map(n=>({...n,type:'便笺',view:'notes'})),
   ] : [], [query, reminders, events, notes])
   if (cloud && !authReady) return <div className="auth-backdrop"><div className="auth-card auth-waiting"><div className="auth-mark"><Check/></div><p>正在连接云端…</p></div></div>
-  if (cloud && !session && !localBypass) return <LoginScreen onLocal={() => setLocalBypass(true)} />
+  if (cloud && !session) return <LoginScreen initialError={authMessage} />
   return <div className="app-shell">{mobileOpen && <button className="sidebar-scrim" onClick={()=>setMobileOpen(false)} aria-label="收起菜单"/>}<JetKSidebar active={active} setActive={setActive} filter={filter} setFilter={setFilter} reminders={reminders} lists={lists} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} openListCreator={()=>setListCreatorOpen(true)} openSettings={()=>setSettingsOpen(true)}/><div className="workspace"><div className="topbar"><button className="mobile-menu" onClick={()=>setMobileOpen(!mobileOpen)} aria-label={mobileOpen?'收起菜单':'展开菜单'}><Menu/></button><button className="search-trigger" onClick={()=>setSearchOpen(true)}><Search/><span>搜索提醒事项、日历与便笺</span><kbd>Ctrl K</kbd></button><button className={`notification-button ${notificationPermission==='granted'?'enabled':''}`} onClick={enableNotifications} title={notificationPermission==='granted'?'提醒已开启':'开启桌面提醒'}><Bell/></button><button className="top-add" onClick={()=>setAddMode(active==='calendar'?'event':active==='notes'?'note':'reminder')}><Plus/></button></div>
     {active==='home' && <Home reminders={reminders} events={events} notes={notes} navigate={navigate} toggleReminder={id=>setReminders(rs=>rs.map(r=>r.id===id?{...r,done:true}:r))}/>} 
     {active==='reminders' && <Reminders reminders={reminders} setReminders={setReminders} filter={filter} lists={lists} openAdd={setAddMode}/>} 
