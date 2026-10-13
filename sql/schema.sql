@@ -155,3 +155,30 @@ begin
   alter publication supabase_realtime add table public.lists;
 exception when duplicate_object then null;
 end $$;
+
+-- 5. 团队成员
+create table if not exists public.members (
+  id uuid primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null default '',
+  role text not null default '',
+  color text not null default '#0a84ff',
+  updated_at timestamptz not null default now()
+);
+create index if not exists members_user_idx on public.members (user_id);
+alter table public.members enable row level security;
+drop policy if exists own_data on public.members;
+create policy own_data on public.members
+  for all to authenticated
+  using (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn')
+  with check (auth.uid() is not null and auth.uid() = user_id and lower(coalesce(auth.jwt()->>'email', '')) = 'zjyeoe@njust.edu.cn');
+
+-- 日程/提醒事项的成员分配（成员 id 数组）
+alter table public.reminders add column if not exists assignees jsonb not null default '[]'::jsonb;
+alter table public.events    add column if not exists assignees jsonb not null default '[]'::jsonb;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.members;
+exception when duplicate_object then null;
+end $$;

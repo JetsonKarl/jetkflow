@@ -214,3 +214,46 @@ html[data-density="compact"] .content{padding-top:25px;padding-bottom:28px}html[
 .mention-chip:hover{filter:brightness(.94)}
 .mention-chip.reminder{background:rgba(10,132,255,.13);color:#0a84ff}
 .mention-chip.event{background:rgba(255,55,95,.12);color:#ff375f}
+
+/* —— 团队：成员分配、徽章、时间线 —— */
+.member-chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
+.member-chips button{display:flex;align-items:center;gap:6px;height:30px;padding:0 11px 0 5px;border-radius:15px;border:1px solid var(--line);font-size:12px;color:#5a5a5f;background:#fff}
+.member-chips button i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:10px;color:#fff;background:var(--member-color,#8e8e93);opacity:.55}
+.member-chips button.active{border-color:var(--member-color);color:#313136;background:color-mix(in srgb,var(--member-color) 10%,#fff)}
+.member-chips button.active i{opacity:1}
+.assignee-badges{display:inline-flex;gap:3px;margin-left:6px;vertical-align:-2px}
+.assignee-badges i{width:16px;height:16px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:9px;color:#fff}
+.agenda-actions .assignee-badges i{width:18px;height:18px;font-size:10px}
+.team-section h4{display:flex;justify-content:space-between;align-items:center}
+.team-count{font-size:10px;color:#9a9a9e;font-weight:400;font-style:normal}
+.team-toggle{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:9px;cursor:pointer;flex-wrap:wrap}
+.team-toggle:hover{background:rgba(0,0,0,.035)}
+.team-toggle input{accent-color:#5e5ce6;width:15px;height:15px;cursor:pointer}
+.team-toggle span{font-size:12px;color:#313136}
+.team-toggle small{width:100%;font-size:10px;color:#9a9a9e;margin-left:23px;margin-top:-4px}
+.team-view{display:flex;flex-direction:column}
+.team-date-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.team-date-bar>button:not(.team-today){width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#fff;border:1px solid var(--line);color:#5a5a5f}
+.team-date-bar>button:not(.team-today):hover{background:#f3f3f5}
+.team-date-bar svg{width:15px}
+.team-today{display:flex;flex-direction:column;align-items:center;padding:5px 16px;border-radius:10px;background:#fff;border:1px solid var(--line);font-size:13px;font-weight:600;color:#313136}
+.team-today small{font-size:9px;color:var(--blue);font-weight:400}
+.team-timeline{display:grid;gap:12px;overflow:auto;padding-bottom:20px}
+.member-row{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.member-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.member-head>div{display:grid;gap:1px;flex:1;min-width:0}
+.member-head b{font-size:14px}
+.member-head small{font-size:11px;color:#9a9a9e}
+.member-head em{font-style:normal;font-size:11px;color:#9a9a9e}
+.member-avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:14px;font-weight:600;color:#fff;flex:none;background:#8e8e93}
+.member-remove{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#b3b3b8}
+.member-remove:hover{background:#fdecea;color:#e4362c}
+.member-remove svg{width:13px}
+.member-items{display:grid;gap:6px}
+.member-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;background:color-mix(in srgb,var(--event-color,#8e8e93) 8%,#fff);border-left:3px solid var(--event-color,#8e8e93);font-size:12px;text-align:left}
+.member-item b{font-size:11px;color:#69696e;white-space:nowrap;min-width:76px}
+.member-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#313136}
+.member-item small{font-size:10px;color:#9a9a9e;flex:none}
+.member-empty{font-size:11px;color:#b3b3b8;margin:2px 0 4px}
+.member-row.unassigned .member-avatar{background:#8e8e93}
+@media(max-width:900px){.member-item b{min-width:62px}.bottom-nav button span{font-size:9px}}

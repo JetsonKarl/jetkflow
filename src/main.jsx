@@ -4,7 +4,7 @@ import {
   Bell, Bold, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight,
   Clock3, Command, FileText, Flag, Inbox, Italic, List, ListOrdered, Menu,
   MoreHorizontal, PenLine, Pin, Plus, Search, Settings, Sparkles,
-  Sun, Tag, Trash2, Type, Underline, X
+  Sun, Tag, Trash2, Type, Underline, UserPlus, Users, X
 } from 'lucide-react'
 import './styles.css'
 import { cloud, cloudReady } from './cloud.js'
@@ -49,6 +49,12 @@ const defaultLists = [
   { id: 'l3', name: '成长', color: '#bf5af2' },
 ]
 
+const seedMembers = [
+  { id: 'm1', name: '陈晨', role: '设计师', color: '#bf5af2' },
+  { id: 'm2', name: '林悦', role: '工程师', color: '#34c759' },
+]
+const memberColors = ['#0a84ff', '#ff9f0a', '#bf5af2', '#34c759', '#ff375f', '#5e5ce6', '#64d2ff', '#ffd60a']
+
 const listColors = ['#0a84ff', '#ff9f0a', '#bf5af2', '#34c759', '#ff375f', '#5e5ce6']
 const calendarOptions = [
   { name:'工作', color:'#ff375f' }, { name:'生活', color:'#34c759' },
@@ -68,13 +74,18 @@ function useLocalState(key, initial) {
 const cloudTables = {
   reminders: {
     table: 'reminders',
-    toRow: r => ({ id: r.id, title: r.title, date: r.date || null, time: r.time || null, list: r.list, color: r.color, done: r.done, priority: r.priority, notes: r.notes || '' }),
-    fromRow: row => ({ id: row.id, title: row.title, date: row.date, time: row.time, list: row.list, color: row.color, done: row.done, priority: row.priority, notes: row.notes || '' }),
+    toRow: r => ({ id: r.id, title: r.title, date: r.date || null, time: r.time || null, list: r.list, color: r.color, done: r.done, priority: r.priority, notes: r.notes || '', assignees: r.assignees || [] }),
+    fromRow: row => ({ id: row.id, title: row.title, date: row.date, time: row.time, list: row.list, color: row.color, done: row.done, priority: row.priority, notes: row.notes || '', assignees: row.assignees || [] }),
   },
   events: {
     table: 'events',
-    toRow: e => ({ id: e.id, title: e.title, date: e.date || null, start_time: e.start || null, end_time: e.end || null, calendar: e.calendar, color: e.color, location: e.location || '', reminder_id: e.reminderId || null }),
-    fromRow: row => ({ id: row.id, title: row.title, date: row.date, start: row.start_time, end: row.end_time, calendar: row.calendar, color: row.color, location: row.location || '', reminderId: row.reminder_id }),
+    toRow: e => ({ id: e.id, title: e.title, date: e.date || null, start_time: e.start || null, end_time: e.end || null, calendar: e.calendar, color: e.color, location: e.location || '', reminder_id: e.reminderId || null, assignees: e.assignees || [] }),
+    fromRow: row => ({ id: row.id, title: row.title, date: row.date, start: row.start_time, end: row.end_time, calendar: row.calendar, color: row.color, location: row.location || '', reminderId: row.reminder_id, assignees: row.assignees || [] }),
+  },
+  members: {
+    table: 'members',
+    toRow: m => ({ id: m.id, name: m.name, role: m.role || '', color: m.color }),
+    fromRow: row => ({ id: row.id, name: row.name, role: row.role || '', color: row.color }),
   },
   notes: {
     table: 'notes',
@@ -170,20 +181,21 @@ function Modal({ title, children, onClose, onSave, saveLabel = '添加' }) {
   </div>
 }
 
-function ReminderEditor({ reminder, lists, onClose, onSave, onDelete }) {
-  const [draft, setDraft] = useState({...reminder})
+function ReminderEditor({ reminder, lists, members = [], onClose, onSave, onDelete }) {
+  const [draft, setDraft] = useState({...reminder, assignees: reminder.assignees || []})
   const patch = value => setDraft(current => ({...current, ...value}))
   return <Modal title="编辑提醒事项" onClose={onClose} onSave={() => draft.title.trim() && onSave(draft)} saveLabel="完成">
     <label className="field"><span>标题</span><input autoFocus value={draft.title} onChange={e => patch({title:e.target.value})}/></label>
     <div className="field-row two"><label className="field"><span>日期</span><input type="date" value={draft.date || ''} onChange={e => patch({date:e.target.value})}/></label><label className="field"><span>时间</span><input type="time" value={draft.time || ''} onChange={e => patch({time:e.target.value})}/></label></div>
     <div className="field-row two"><label className="field"><span>列表</span><select value={draft.list} onChange={e => { const list=lists.find(l=>l.name===e.target.value); patch({list:e.target.value,color:list?.color||draft.color}) }}>{lists.map(l=><option key={l.id} value={l.name}>{l.name}</option>)}</select></label><label className="switch-field"><span><Flag/>标记为重要</span><input type="checkbox" checked={draft.priority} onChange={e=>patch({priority:e.target.checked})}/></label></div>
+    <MemberChips members={members} value={draft.assignees} onChange={ids=>patch({assignees:ids})}/>
     <label className="field"><span>备注</span><textarea value={draft.notes || ''} onChange={e=>patch({notes:e.target.value})} placeholder="添加备注"/></label>
     <button className="danger-button" onClick={() => onDelete(reminder.id)}><Trash2/>删除提醒事项</button>
   </Modal>
 }
 
-function EventEditor({ event, onClose, onSave, onDelete }) {
-  const [draft, setDraft] = useState({...event, sync:Boolean(event.reminderId)})
+function EventEditor({ event, members = [], onClose, onSave, onDelete }) {
+  const [draft, setDraft] = useState({...event, sync:Boolean(event.reminderId), assignees: event.assignees || []})
   const patch = value => setDraft(current => ({...current,...value}))
   return <Modal title="编辑日程" onClose={onClose} onSave={() => draft.title.trim() && onSave(draft)} saveLabel="完成">
     <label className="field"><span>标题</span><input autoFocus value={draft.title} onChange={e=>patch({title:e.target.value})}/></label>
@@ -191,6 +203,7 @@ function EventEditor({ event, onClose, onSave, onDelete }) {
     <div className="field-row two"><label className="field"><span>开始</span><input type="time" value={draft.start} onChange={e=>patch({start:e.target.value})}/></label><label className="field"><span>结束</span><input type="time" value={draft.end} onChange={e=>patch({end:e.target.value})}/></label></div>
     <div className="field-row two"><label className="field"><span>日历</span><select value={draft.calendar} onChange={e=>{const calendar=calendarOptions.find(c=>c.name===e.target.value);patch({calendar:e.target.value,color:calendar?.color||draft.color})}}>{calendarOptions.map(c=><option key={c.name} value={c.name}>{c.name}</option>)}</select></label><label className="field"><span>地点</span><input value={draft.location||''} onChange={e=>patch({location:e.target.value})} placeholder="可选"/></label></div>
     <label className="switch-row"><span><Bell/><b>同步到提醒事项</b><small>日程变化时同步更新提醒</small></span><input type="checkbox" checked={draft.sync} onChange={e=>patch({sync:e.target.checked})}/></label>
+    <MemberChips members={members} value={draft.assignees} onChange={ids=>patch({assignees:ids})}/>
     <button className="danger-button" onClick={()=>onDelete(event)}><Trash2/>删除日程</button>
   </Modal>
 }
@@ -255,7 +268,18 @@ function SettingsPanel({ settings, setSettings, notificationPermission, enableNo
   </Modal>
 }
 
-function QuickAdd({ mode, lists, activeList, onClose, onAddReminder, onAddEvent, onAddNote }) {
+function AssigneeBadges({ assignees, members }) {
+  if (!assignees?.length) return null
+  return <span className="assignee-badges">{assignees.map(id => members.find(m => m.id === id)).filter(Boolean).map(m => <i key={m.id} style={{background: m.color}} title={`分配给 ${m.name}`}>{m.name[0]}</i>)}</span>
+}
+
+function MemberChips({ members, value = [], onChange }) {
+  if (!members.length) return null
+  const toggle = id => onChange(value.includes(id) ? value.filter(x => x !== id) : [...value, id])
+  return <div className="field"><span>分配给</span><div className="member-chips">{members.map(m => <button type="button" key={m.id} className={value.includes(m.id) ? 'active' : ''} style={{'--member-color': m.color}} onClick={() => toggle(m.id)}><i>{m.name[0]}</i>{m.name}</button>)}</div></div>
+}
+
+function QuickAdd({ mode, lists, activeList, members = [], onClose, onAddReminder, onAddEvent, onAddNote }) {
   const [type, setType] = useState(mode || 'reminder')
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(todayKey)
@@ -264,12 +288,13 @@ function QuickAdd({ mode, lists, activeList, onClose, onAddReminder, onAddEvent,
   const [sync, setSync] = useState(true)
   const [notes, setNotes] = useState('')
   const [list, setList] = useState(activeList || lists[0]?.name || '个人')
+  const [assignees, setAssignees] = useState([])
   const inputRef = useRef(null)
   useEffect(() => inputRef.current?.focus(), [type])
   const save = () => {
     if (!title.trim()) return inputRef.current?.focus()
-    if (type === 'reminder') onAddReminder({ title, date, time, notes, list, color:lists.find(l=>l.name===list)?.color || '#0a84ff' })
-    if (type === 'event') onAddEvent({ title, date, start: time, end, sync })
+    if (type === 'reminder') onAddReminder({ title, date, time, notes, list, color:lists.find(l=>l.name===list)?.color || '#0a84ff', assignees })
+    if (type === 'event') onAddEvent({ title, date, start: time, end, sync, assignees })
     if (type === 'note') onAddNote({ title, content: notes })
     onClose()
   }
@@ -283,6 +308,7 @@ function QuickAdd({ mode, lists, activeList, onClose, onAddReminder, onAddEvent,
     {type !== 'note' && <div className="field-row"><label className="field"><span>日期</span><input type="date" value={date} onChange={e => setDate(e.target.value)} /></label><label className="field"><span>{type === 'event' ? '开始' : '时间'}</span><input type="time" value={time} onChange={e => setTime(e.target.value)} /></label>{type === 'event' && <label className="field"><span>结束</span><input type="time" value={end} onChange={e => setEnd(e.target.value)} /></label>}</div>}
     {type === 'reminder' && <label className="field"><span>列表</span><select value={list} onChange={e=>setList(e.target.value)}>{lists.map(l=><option key={l.id} value={l.name}>{l.name}</option>)}</select></label>}
     {type === 'event' && <label className="switch-row"><span><CheckCircle2/><b>同步到提醒事项</b><small>日程开始时同时提醒</small></span><input type="checkbox" checked={sync} onChange={e => setSync(e.target.checked)} /></label>}
+    {type !== 'note' && <MemberChips members={members} value={assignees} onChange={setAssignees}/>}
     <label className="field"><span>{type === 'note' ? '正文' : '备注'}</span><textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={type === 'note' ? '开始记录… 使用 @ 关联日程或提醒事项' : '可选'} /></label>
   </Modal>
 }
@@ -305,7 +331,7 @@ function Home({ reminders, events, notes, navigate, toggleReminder }) {
   </main>
 }
 
-function Reminders({ reminders, setReminders, filter, lists, openAdd }) {
+function Reminders({ reminders, setReminders, filter, lists, members = [], openAdd }) {
   const listName = filter.startsWith('list:') ? filter.slice(5) : null
   const filtered = reminders.filter(r => listName ? r.list === listName && !r.done : filter === 'completed' ? r.done : filter === 'today' ? r.date === todayKey && !r.done : filter === 'scheduled' ? r.date && !r.done : !r.done)
   const grouped = filtered.reduce((acc, r) => { const k = r.date || 'none'; (acc[k] ||= []).push(r); return acc }, {})
@@ -320,17 +346,17 @@ function Reminders({ reminders, setReminders, filter, lists, openAdd }) {
         <h3>{formatDateLabel(date)}<span>{items.length}</span></h3>
         {items.map(r => <div className={`reminder-row ${r.done ? 'done' : ''}`} key={r.id} onClick={() => setEditing(r)} role="button" tabIndex="0" onKeyDown={e=>e.key==='Enter'&&setEditing(r)}>
           <button className="check large" style={{borderColor:r.color}} onClick={e => {e.stopPropagation();toggle(r.id)}} aria-label={`完成 ${r.title}`}><Check/></button>
-          <div className="reminder-main"><b>{r.title}</b>{r.notes && <p>{r.notes}</p>}<small><Clock3/>{r.time || '全天'}<i/> <span style={{color:r.color}}>{r.list}</span></small></div>
+          <div className="reminder-main"><b>{r.title}</b>{r.notes && <p>{r.notes}</p>}<small><Clock3/>{r.time || '全天'}<i/> <span style={{color:r.color}}>{r.list}</span><AssigneeBadges assignees={r.assignees} members={members}/></small></div>
           {r.priority && <Flag className="flag"/>}<button className="more edit-indicator" onClick={e => {e.stopPropagation();setEditing(r)}} title="编辑"><ChevronRight/></button>
         </div>)}
       </div>)}
       <button className="inline-add" onClick={() => openAdd('reminder')}><Plus/>新提醒事项</button>
     </section>
-    {editing && <ReminderEditor reminder={editing} lists={lists} onClose={()=>setEditing(null)} onSave={updated=>{setReminders(items=>items.map(r=>r.id===updated.id?updated:r));setEditing(null)}} onDelete={id=>{setReminders(items=>items.filter(r=>r.id!==id));setEditing(null)}}/>}
+    {editing && <ReminderEditor reminder={editing} lists={lists} members={members} onClose={()=>setEditing(null)} onSave={updated=>{setReminders(items=>items.map(r=>r.id===updated.id?updated:r));setEditing(null)}} onDelete={id=>{setReminders(items=>items.filter(r=>r.id!==id));setEditing(null)}}/>}
   </main>
 }
 
-function CalendarView({ events, setEvents, reminders, setReminders, selectedDate, setSelectedDate, viewDate, setViewDate, openAdd }) {
+function CalendarView({ events, setEvents, reminders, setReminders, selectedDate, setSelectedDate, viewDate, setViewDate, members = [], openAdd }) {
   const year = viewDate.getFullYear(), month = viewDate.getMonth()
   const first = new Date(year, month, 1), last = new Date(year, month + 1, 0)
   const startOffset = (first.getDay() + 6) % 7
@@ -348,8 +374,8 @@ function CalendarView({ events, setEvents, reminders, setReminders, selectedDate
     if (!draft.sync && reminderId) setReminders(items=>items.filter(r=>r.id!==reminderId))
     if (draft.sync) {
       setReminders(items => {
-        const synced = {id:reminderId,title:draft.title,date:draft.date,time:draft.start,notes:'从日历同步',list:'个人',color:'#0a84ff',done:false,priority:false}
-        return items.some(r=>r.id===reminderId) ? items.map(r=>r.id===reminderId?{...r,title:draft.title,date:draft.date,time:draft.start}:r) : [synced,...items]
+        const synced = {id:reminderId,title:draft.title,date:draft.date,time:draft.start,notes:'从日历同步',list:'个人',color:'#0a84ff',done:false,priority:false,assignees:draft.assignees||[]}
+        return items.some(r=>r.id===reminderId) ? items.map(r=>r.id===reminderId?{...r,title:draft.title,date:draft.date,time:draft.start,assignees:draft.assignees||[]}:r) : [synced,...items]
       })
     }
     const updated = {...draft,reminderId:draft.sync?reminderId:null}
@@ -367,8 +393,8 @@ function CalendarView({ events, setEvents, reminders, setReminders, selectedDate
       const key = dateKey(d), dayEvents = events.filter(e => e.date === key), outside = d.getMonth() !== month
       return <button key={key} className={`day-cell ${outside?'outside':''} ${key===selectedDate?'selected':''}`} onClick={() => setSelectedDate(key)}><span className={key === todayKey ? 'today-number' : ''}>{d.getDate()}</span><div className="event-stack">{dayEvents.slice(0,3).map(ev => <i key={ev.id} style={{'--event-color':ev.color}} onClick={e=>{e.stopPropagation();setSelectedDate(key);setEditing(ev)}} title={`编辑：${ev.title}`}><b>{ev.start}</b> {ev.title}</i>)}</div></button>
     })}</div></section>
-    <aside className="agenda-panel"><div className="agenda-date"><span>{new Date(`${selectedDate}T00:00:00`).getDate()}</span><div><b>{formatDateLabel(selectedDate)}</b><small>{selectedEvents.length ? `${selectedEvents.length} 个日程` : '暂无日程'}</small></div></div>{selectedEvents.map(ev => <button className="agenda-event" key={ev.id} style={{'--event-color':ev.color}} onClick={()=>setEditing(ev)}><div><b>{ev.title}</b><span>{ev.start} – {ev.end}</span>{ev.location && <small>{ev.location}</small>}</div><span className="agenda-actions">{ev.reminderId && <Bell/>}<ChevronRight/></span></button>)}{!selectedEvents.length && <div className="agenda-empty"><CalendarDays/><p>这一天还很自由</p></div>}<button className="agenda-add" onClick={() => openAdd('event')}><Plus/>添加日程</button></aside></div>
-    {editing && <EventEditor event={editing} onClose={()=>setEditing(null)} onSave={saveEvent} onDelete={deleteEvent}/>} 
+    <aside className="agenda-panel"><div className="agenda-date"><span>{new Date(`${selectedDate}T00:00:00`).getDate()}</span><div><b>{formatDateLabel(selectedDate)}</b><small>{selectedEvents.length ? `${selectedEvents.length} 个日程` : '暂无日程'}</small></div></div>{selectedEvents.map(ev => <button className="agenda-event" key={ev.id} style={{'--event-color':ev.color}} onClick={()=>setEditing(ev)}><div><b>{ev.title}</b><span>{ev.start} – {ev.end}</span>{ev.location && <small>{ev.location}</small>}</div><span className="agenda-actions"><AssigneeBadges assignees={ev.assignees} members={members}/>{ev.reminderId && <Bell/>}<ChevronRight/></span></button>)}{!selectedEvents.length && <div className="agenda-empty"><CalendarDays/><p>这一天还很自由</p></div>}<button className="agenda-add" onClick={() => openAdd('event')}><Plus/>添加日程</button></aside></div>
+    {editing && <EventEditor event={editing} members={members} onClose={()=>setEditing(null)} onSave={saveEvent} onDelete={deleteEvent}/>} 
   </main>
 }
 
@@ -537,11 +563,66 @@ function Sidebar({ active, setActive, filter, setFilter, reminders, mobileOpen, 
   return <aside className={`sidebar ${mobileOpen?'mobile-open':''}`}><div className="traffic"><i/><i/><i/></div><div className="brand"><div className="brand-mark"><Check/></div><span>Dayflow</span></div><nav>{nav.map(item => {const Icon=item.icon;return <button className={active===item.id?'active':''} key={item.id} onClick={()=>choose(item.id)}><Icon/><span>{item.label}</span></button>})}</nav><div className="nav-section"><h4>提醒事项</h4>{smart.map(item => {const Icon=item.icon;return <button className={active==='reminders'&&filter===item.id?'active':''} key={item.id} onClick={()=>{setFilter(item.id);choose('reminders')}}><i style={{background:item.color}}><Icon/></i><span>{item.label}</span><em>{item.count}</em></button>})}</div><div className="nav-section lists"><h4>我的列表 <Plus/></h4>{lists.map(l => <button key={l.name} onClick={()=>{setFilter('all');choose('reminders')}}><i style={{background:l.color}}/><span>{l.name}</span><em>{reminders.filter(r=>r.list===l.name&&!r.done).length}</em></button>)}</div><div className="sidebar-foot"><button><Settings/><span>设置</span></button><div className="avatar">Z</div></div></aside>
 }
 
-function JetKSidebar({ active, setActive, filter, setFilter, reminders, lists, mobileOpen, setMobileOpen, openListCreator, openSettings }) {
+function AddMemberModal({ existing, onClose, onAdd }) {
+  const [name, setName] = useState('')
+  const [role, setRole] = useState('')
+  const [color, setColor] = useState(memberColors[existing % memberColors.length])
+  const save = () => name.trim() && onAdd({ id: crypto.randomUUID(), name: name.trim(), role: role.trim(), color })
+  return <Modal title="添加成员" onClose={onClose} onSave={save} saveLabel="添加">
+    <label className="field"><span>姓名</span><input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="成员姓名" onKeyDown={e=>e.key==='Enter'&&save()}/></label>
+    <label className="field"><span>角色</span><input value={role} onChange={e=>setRole(e.target.value)} placeholder="例如：设计师 / 工程师（可选）" onKeyDown={e=>e.key==='Enter'&&save()}/></label>
+    <div className="color-picker"><span>颜色</span><div>{memberColors.map(c=><button key={c} className={color===c?'selected':''} style={{background:c}} onClick={()=>setColor(c)} aria-label={`选择颜色 ${c}`}><Check/></button>)}</div></div>
+  </Modal>
+}
+
+function TeamView({ members, setMembers, reminders, setReminders, events, setEvents, openAdd }) {
+  const [date, setDate] = useState(todayKey)
+  const [adding, setAdding] = useState(false)
+  const shift = delta => { const d = new Date(`${date}T00:00:00`); d.setDate(d.getDate() + delta); setDate(dateKey(d)) }
+  const removeMember = m => {
+    if (!window.confirm(`移除成员「${m.name}」？分配给ta的条目会变回你的个人条目。`)) return
+    setMembers(items => items.filter(x => x.id !== m.id))
+    setReminders(items => items.map(r => r.assignees?.includes(m.id) ? {...r, assignees: r.assignees.filter(x => x !== m.id)} : r))
+    setEvents(items => items.map(e => e.assignees?.includes(m.id) ? {...e, assignees: e.assignees.filter(x => x !== m.id)} : e))
+  }
+  const unassignedEvents = events.filter(e => e.date === date && !e.assignees?.length).sort((a,b) => a.start.localeCompare(b.start))
+  const unassignedReminders = reminders.filter(r => r.date === date && !r.done && !r.assignees?.length)
+  const memberRow = m => {
+    const myEvents = events.filter(e => e.date === date && e.assignees?.includes(m.id)).sort((a,b) => a.start.localeCompare(b.start))
+    const myReminders = reminders.filter(r => r.date === date && !r.done && r.assignees?.includes(m.id))
+    return <div className="member-row" key={m.id}>
+      <div className="member-head"><i className="member-avatar" style={{background: m.color}}>{m.name[0]}</i><div><b>{m.name}</b><small>{m.role || '成员'}</small></div><em>{myEvents.length + myReminders.length || ''}</em><button className="member-remove" title={`移除 ${m.name}`} onClick={() => removeMember(m)}><X/></button></div>
+      <div className="member-items">
+        {myEvents.map(e => <div className="member-item" key={e.id} style={{'--event-color': e.color}}><b>{e.start}–{e.end}</b><span>{e.title}</span><small>日程</small></div>)}
+        {myReminders.map(r => <div className="member-item" key={r.id} style={{'--event-color': r.color}}><b>{r.time || '全天'}</b><span>{r.title}</span><small>提醒</small></div>)}
+        {!myEvents.length && !myReminders.length && <p className="member-empty">当天暂无安排</p>}
+      </div>
+    </div>
+  }
+  return <main className="content team-view">
+    <header className="page-heading compact"><div><span className="eyebrow">团队</span><h1>成员与时间线</h1></div><button className="round-action" onClick={() => setAdding(true)}><UserPlus/>添加成员</button></header>
+    <div className="team-date-bar"><button onClick={() => shift(-1)} aria-label="前一天"><ChevronLeft/></button><button className="team-today" onClick={() => setDate(todayKey)}>{formatDateLabel(date)}{date !== todayKey && <small>回到今天</small>}</button><button onClick={() => shift(1)} aria-label="后一天"><ChevronRight/></button></div>
+    <section className="team-timeline">
+      {members.map(memberRow)}
+      {(unassignedEvents.length > 0 || unassignedReminders.length > 0) && <div className="member-row unassigned">
+        <div className="member-head"><i className="member-avatar">我</i><div><b>未分配（我自己）</b><small>{unassignedEvents.length + unassignedReminders.length} 项</small></div></div>
+        <div className="member-items">
+          {unassignedEvents.map(e => <div className="member-item" key={e.id} style={{'--event-color': e.color}}><b>{e.start}–{e.end}</b><span>{e.title}</span><small>日程</small></div>)}
+          {unassignedReminders.map(r => <div className="member-item" key={r.id} style={{'--event-color': r.color}}><b>{r.time || '全天'}</b><span>{r.title}</span><small>提醒</small></div>)}
+        </div>
+      </div>}
+      {!members.length && <div className="empty-state"><Users/><h3>还没有团队成员</h3><p>添加成员后，新建日程或提醒事项时可以分配给ta，并在这里查看每个人的时间线。</p></div>}
+    </section>
+    {adding && <AddMemberModal existing={members.length} onClose={() => setAdding(false)} onAdd={m => { setMembers(items => [...items, m]); setAdding(false) }}/>}
+  </main>
+}
+
+function JetKSidebar({ active, setActive, filter, setFilter, reminders, lists, members = [], showTeam, onToggleTeam, mobileOpen, setMobileOpen, openListCreator, openSettings }) {
   const nav = [
     {id:'home', label:'今天概览', icon:Sparkles},
     {id:'calendar', label:'日历', icon:CalendarDays},
     {id:'notes', label:'便笺', icon:FileText},
+    {id:'team', label:'团队', icon:Users},
   ]
   const smart = [
     {id:'today', label:'今天', icon:Sun, color:'#0a84ff', count:reminders.filter(r => r.date===todayKey&&!r.done).length},
@@ -556,6 +637,7 @@ function JetKSidebar({ active, setActive, filter, setFilter, reminders, lists, m
     <nav>{nav.map(item => {const Icon=item.icon;return <button className={active===item.id?'active':''} key={item.id} onClick={()=>choose(item.id)}><Icon/><span>{item.label}</span></button>})}</nav>
     <div className="nav-section"><h4>提醒事项</h4>{smart.map(item => {const Icon=item.icon;return <button className={active==='reminders'&&filter===item.id?'active':''} key={item.id} onClick={()=>{setFilter(item.id);choose('reminders')}}><i style={{background:item.color}}><Icon/></i><span>{item.label}</span><em>{item.count}</em></button>})}</div>
     <div className="nav-section lists"><h4><span>我的列表</span><button className="section-add" onClick={openListCreator} title="新建列表"><Plus/></button></h4>{lists.map(l => <button className={active==='reminders'&&filter===`list:${l.name}`?'active':''} key={l.id} onClick={()=>{setFilter(`list:${l.name}`);choose('reminders')}}><i style={{background:l.color}}/><span>{l.name}</span><em>{reminders.filter(r=>r.list===l.name&&!r.done).length}</em></button>)}</div>
+    <div className="nav-section team-section"><h4><span>团队</span><em className="team-count">{members.length} 人</em></h4><label className="team-toggle"><input type="checkbox" checked={showTeam} onChange={e=>onToggleTeam(e.target.checked)}/><span>显示团队项目</span><small>{showTeam ? '已混入你的视图' : '仅看我自己的'}</small></label></div>
     <div className="sidebar-foot"><button onClick={openSettings}><Settings/><span>设置</span></button><div className="avatar">Z</div></div>
   </aside>
 }
@@ -566,6 +648,7 @@ function BottomNav({ active, onNavigate }) {
     {id:'calendar', label:'日历', icon:CalendarDays},
     {id:'reminders', label:'提醒事项', icon:CheckCircle2},
     {id:'notes', label:'便笺', icon:FileText},
+    {id:'team', label:'团队', icon:Users},
   ]
   return <nav className="bottom-nav" aria-label="主要导航">{items.map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>onNavigate(item.id)}><Icon/><span>{item.label}</span></button>})}</nav>
 }
@@ -605,6 +688,11 @@ function App() {
   const [events, setEvents] = useSyncedState('dayflow-events', seedEvents, cloudTables.events)
   const [notes, setNotes] = useSyncedState('dayflow-notes', seedNotes, cloudTables.notes)
   const [lists, setLists] = useSyncedState('jetkflow-lists', defaultLists, cloudTables.lists)
+  const [members, setMembers] = useSyncedState('jetkflow-members', seedMembers, cloudTables.members)
+  const showTeam = settings.showTeam !== false
+  const isTeamItem = item => (item.assignees?.length || 0) > 0
+  const visibleReminders = useMemo(() => showTeam ? reminders : reminders.filter(r => !isTeamItem(r)), [reminders, showTeam])
+  const visibleEvents = useMemo(() => showTeam ? events : events.filter(e => !isTeamItem(e)), [events, showTeam])
   const [selectedNote, setSelectedNote] = useState(notes[0]?.id)
   const [selectedDate, setSelectedDate] = useState(todayKey)
   const [viewDate, setViewDate] = useState(now)
@@ -652,11 +740,11 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
   const signOut = () => { setAuthMessage(''); cloud?.auth.signOut() }
-  const addReminder = data => setReminders(rs => [{id:crypto.randomUUID(), list:'个人', color:'#0a84ff', done:false, priority:false, ...data}, ...rs])
+  const addReminder = data => setReminders(rs => [{id:crypto.randomUUID(), list:'个人', color:'#0a84ff', done:false, priority:false, assignees:[], ...data}, ...rs])
   const addEvent = data => {
     const id=crypto.randomUUID(); let reminderId=null
-    if (data.sync) { reminderId=crypto.randomUUID(); addReminder({id:reminderId,title:data.title,date:data.date,time:data.start,notes:'从日历同步'}) }
-    setEvents(es => [...es, {id,title:data.title,date:data.date,start:data.start,end:data.end,calendar:'个人',color:'#0a84ff',location:'',reminderId}])
+    if (data.sync) { reminderId=crypto.randomUUID(); addReminder({id:reminderId,title:data.title,date:data.date,time:data.start,notes:'从日历同步',assignees:data.assignees||[]}) }
+    setEvents(es => [...es, {id,title:data.title,date:data.date,start:data.start,end:data.end,calendar:'个人',color:'#0a84ff',location:'',reminderId,assignees:data.assignees||[]}])
   }
   const addNote = data => { const id=crypto.randomUUID(); setNotes(ns => [{id,updated:'刚刚',pinned:false,folder:'便笺',color:'#f0b90b',...data},...ns]); setSelectedNote(id); setActive('notes') }
   const enableNotifications = async () => {
@@ -733,18 +821,19 @@ function App() {
     return () => lifecycle.abort()
   }, [session, setReminders, setEvents, setNotes, reminders, events])
   const results = useMemo(() => query ? [
-    ...reminders.filter(r=>r.title.includes(query)).map(r=>({...r,type:'提醒事项',view:'reminders'})),
-    ...events.filter(e=>e.title.includes(query)).map(e=>({...e,type:'日历',view:'calendar'})),
+    ...visibleReminders.filter(r=>r.title.includes(query)).map(r=>({...r,type:'提醒事项',view:'reminders'})),
+    ...visibleEvents.filter(e=>e.title.includes(query)).map(e=>({...e,type:'日历',view:'calendar'})),
     ...notes.filter(n=>(n.title+n.content).includes(query)).map(n=>({...n,type:'便笺',view:'notes'})),
-  ] : [], [query, reminders, events, notes])
+  ] : [], [query, visibleReminders, visibleEvents, notes])
   if (cloud && !authReady) return <div className="auth-backdrop"><div className="auth-card auth-waiting"><div className="auth-mark"><Check/></div><p>正在连接云端…</p></div></div>
   if (cloud && !session) return <LoginScreen initialError={authMessage} />
-  return <div className="app-shell">{mobileOpen && <button className="sidebar-scrim" onClick={()=>setMobileOpen(false)} aria-label="收起菜单"/>}<JetKSidebar active={active} setActive={setActive} filter={filter} setFilter={setFilter} reminders={reminders} lists={lists} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} openListCreator={()=>setListCreatorOpen(true)} openSettings={()=>setSettingsOpen(true)}/><div className="workspace"><div className="topbar"><button className="mobile-menu" onClick={()=>setMobileOpen(!mobileOpen)} aria-label={mobileOpen?'收起菜单':'展开菜单'}><Menu/></button><button className="search-trigger" onClick={()=>setSearchOpen(true)}><Search/><span>搜索提醒事项、日历与便笺</span><kbd>Ctrl K</kbd></button><button className={`notification-button ${notificationPermission==='granted'?'enabled':''}`} onClick={enableNotifications} title={notificationPermission==='granted'?'提醒已开启':'开启桌面提醒'}><Bell/></button><button className="top-add" onClick={()=>setAddMode(active==='calendar'?'event':active==='notes'?'note':'reminder')}><Plus/></button></div>
-    {active==='home' && <Home reminders={reminders} events={events} notes={notes} navigate={navigate} toggleReminder={id=>setReminders(rs=>rs.map(r=>r.id===id?{...r,done:true}:r))}/>} 
-    {active==='reminders' && <Reminders reminders={reminders} setReminders={setReminders} filter={filter} lists={lists} openAdd={setAddMode}/>} 
-    {active==='calendar' && <CalendarView events={events} setEvents={setEvents} reminders={reminders} setReminders={setReminders} selectedDate={selectedDate} setSelectedDate={setSelectedDate} viewDate={viewDate} setViewDate={setViewDate} openAdd={setAddMode}/>} 
-    {active==='notes' && <NotesView notes={notes} setNotes={setNotes} selectedNote={selectedNote} setSelectedNote={setSelectedNote} reminders={reminders} events={events} openAdd={setAddMode} navigate={navigate}/>}</div><BottomNav active={active} onNavigate={view=>{if(view==='reminders')setFilter('today');setActive(view);setMobileOpen(false)}}/>
-    {addMode && <QuickAdd mode={addMode} lists={lists} activeList={filter.startsWith('list:')?filter.slice(5):null} onClose={()=>setAddMode(null)} onAddReminder={addReminder} onAddEvent={addEvent} onAddNote={addNote}/>} 
+  return <div className="app-shell">{mobileOpen && <button className="sidebar-scrim" onClick={()=>setMobileOpen(false)} aria-label="收起菜单"/>}<JetKSidebar active={active} setActive={setActive} filter={filter} setFilter={setFilter} reminders={visibleReminders} lists={lists} members={members} showTeam={showTeam} onToggleTeam={checked=>setSettings(s=>({...s,showTeam:checked}))} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} openListCreator={()=>setListCreatorOpen(true)} openSettings={()=>setSettingsOpen(true)}/><div className="workspace"><div className="topbar"><button className="mobile-menu" onClick={()=>setMobileOpen(!mobileOpen)} aria-label={mobileOpen?'收起菜单':'展开菜单'}><Menu/></button><button className="search-trigger" onClick={()=>setSearchOpen(true)}><Search/><span>搜索提醒事项、日历与便笺</span><kbd>Ctrl K</kbd></button><button className={`notification-button ${notificationPermission==='granted'?'enabled':''}`} onClick={enableNotifications} title={notificationPermission==='granted'?'提醒已开启':'开启桌面提醒'}><Bell/></button><button className="top-add" onClick={()=>setAddMode(active==='calendar'?'event':active==='notes'?'note':'reminder')}><Plus/></button></div>
+    {active==='home' && <Home reminders={visibleReminders} events={visibleEvents} notes={notes} navigate={navigate} toggleReminder={id=>setReminders(rs=>rs.map(r=>r.id===id?{...r,done:true}:r))}/>} 
+    {active==='reminders' && <Reminders reminders={visibleReminders} setReminders={setReminders} filter={filter} lists={lists} members={members} openAdd={setAddMode}/>} 
+    {active==='calendar' && <CalendarView events={visibleEvents} setEvents={setEvents} reminders={visibleReminders} setReminders={setReminders} selectedDate={selectedDate} setSelectedDate={setSelectedDate} viewDate={viewDate} setViewDate={setViewDate} members={members} openAdd={setAddMode}/>} 
+    {active==='notes' && <NotesView notes={notes} setNotes={setNotes} selectedNote={selectedNote} setSelectedNote={setSelectedNote} reminders={visibleReminders} events={visibleEvents} openAdd={setAddMode} navigate={navigate}/>} 
+    {active==='team' && <TeamView members={members} setMembers={setMembers} reminders={reminders} setReminders={setReminders} events={events} setEvents={setEvents} openAdd={setAddMode}/>}</div><BottomNav active={active} onNavigate={view=>{if(view==='reminders')setFilter('today');setActive(view);setMobileOpen(false)}}/>
+    {addMode && <QuickAdd mode={addMode} lists={lists} members={members} activeList={filter.startsWith('list:')?filter.slice(5):null} onClose={()=>setAddMode(null)} onAddReminder={addReminder} onAddEvent={addEvent} onAddNote={addNote}/>} 
     {listCreatorOpen && <AddListModal onClose={()=>setListCreatorOpen(false)} onAdd={list=>{setLists(items=>[...items,list]);setFilter(`list:${list.name}`);setActive('reminders');setListCreatorOpen(false)}}/>}
     {settingsOpen && <SettingsPanel settings={settings} setSettings={setSettings} notificationPermission={notificationPermission} enableNotifications={enableNotifications} session={session} onSignOut={signOut} onClose={()=>setSettingsOpen(false)}/>}
     {searchOpen && <div className="command-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setSearchOpen(false)}><div className="command-box"><div className="command-input"><Search/><input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索所有内容…"/><button onClick={()=>setSearchOpen(false)}>ESC</button></div>{query && <div className="command-results">{results.length ? results.map((r,i)=><button key={r.id+i} onClick={()=>{navigate(r.view,r.id);setSearchOpen(false)}}><i>{r.type==='日历'?<CalendarDays/>:r.type==='便笺'?<FileText/>:<CheckCircle2/>}</i><span><b>{r.title}</b><small>{r.type}</small></span><ChevronRight/></button>):<p>没有找到“{query}”</p>}</div>} {!query && <div className="command-tip"><span>快速建议</span><button onClick={()=>{setSearchOpen(false);setAddMode('reminder')}}><Plus/>新建提醒事项<kbd>Ctrl N</kbd></button><button onClick={()=>{navigate('calendar');setSearchOpen(false)}}><CalendarDays/>查看今日日程</button></div>}</div></div>}
