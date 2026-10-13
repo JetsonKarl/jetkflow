@@ -17,6 +17,7 @@ const iso = (day, month = m, year = y) => `${year}-${pad(month + 1)}-${pad(day)}
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const todayKey = dateKey(now)
 const ALLOWED_EMAIL = 'zjyeoe@njust.edu.cn'
+const AUTH_DENIED_MESSAGE = '禁止注册/登录，请联系管理员。'
 const normalizeEmail = value => String(value || '').trim().toLowerCase()
 const isAllowedEmail = value => normalizeEmail(value) === ALLOWED_EMAIL
 
@@ -213,9 +214,21 @@ function ChangePasswordModal({ onClose }) {
     if (pw1.length < 8) { setError('密码至少 8 位'); return }
     if (pw1 !== pw2) { setError('两次输入的密码不一致'); return }
     setBusy(true); setError('')
+    // 管理员侧改密或长期挂机会让本地会话失效，先确认会话再改密，给出可操作的提示。
+    const { data: { session: live } } = await cloud.auth.getSession()
+    if (!live) {
+      setBusy(false)
+      setError('登录状态已失效：请退出登录后用旧密码重新登录，再来修改密码')
+      return
+    }
     const { error: err } = await cloud.auth.updateUser({ password: pw1 })
     setBusy(false)
-    if (err) { setError(err.message); return }
+    if (err) {
+      setError(err.message === 'Auth session missing!'
+        ? '登录状态已失效：请退出登录后用旧密码重新登录，再来修改密码'
+        : err.message)
+      return
+    }
     onClose(true)
   }
   return <Modal title="修改密码" onClose={() => onClose(false)} onSave={save} saveLabel={busy ? '保存中…' : '保存'}>
