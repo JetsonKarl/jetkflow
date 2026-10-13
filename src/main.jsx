@@ -35,6 +35,7 @@ const seedEvents = [
   { id: 'e2', title: '专注创作', date: todayKey, start: '14:00', end: '16:00', calendar: '专注', color: '#5856d6', location: '', reminderId: null },
   { id: 'e3', title: '和朋友晚餐', date: iso(now.getDate() + 2), start: '18:30', end: '20:00', calendar: '生活', color: '#34c759', location: '梧桐餐厅', reminderId: null },
   { id: 'e4', title: '设计评审', date: iso(now.getDate() + 5), start: '15:00', end: '16:00', calendar: '工作', color: '#ff375f', location: '线上', reminderId: null },
+  { id: 'e5', title: '新品脑暴会', date: iso(now.getDate() + 1), start: '15:00', end: '16:00', calendar: '工作', color: '#ff375f', location: '会议室 B', reminderId: null },
 ]
 
 const seedNotes = [

@@ -127,17 +127,6 @@ html[data-density="compact"] .content{padding-top:25px;padding-bottom:28px}html[
 .agenda-actions svg{width:13px;height:13px}
 @media(max-width:900px){.event-stack i{position:relative}.event-stack i:after{content:"";position:absolute;inset:-6px}.agenda-event{padding-right:7px}.agenda-actions{color:var(--blue)}}
 
-/* Native Windows shell: keep the app controls clear of the caption buttons. */
-html.desktop-shell body{background:#f7f7f9}
-html.desktop-shell .app-shell{width:100vw;height:100vh;max-width:none;margin:0;border:0;border-radius:0;box-shadow:none}
-html.desktop-shell .traffic{visibility:hidden;-webkit-app-region:drag}
-html.desktop-shell .topbar{-webkit-app-region:drag;padding-right:172px;background:#f7f7f9}
-html.desktop-shell .topbar button,
-html.desktop-shell .topbar input,
-html.desktop-shell .search-trigger{-webkit-app-region:no-drag}
-html.desktop-shell .notification-button{right:200px}
-html.desktop-shell .top-add{right:158px}
-
 /* 登录界面与云同步状态 */
 .auth-backdrop{position:fixed;inset:0;z-index:80;background:radial-gradient(circle at 75% 0,#f9fbff 0,#edf1f6 38%,#e5e7eb 100%);display:grid;place-items:center;animation:fade .16s ease}
 .auth-card{width:min(400px,calc(100vw - 40px));background:rgba(252,252,253,.97);border:1px solid rgba(255,255,255,.8);border-radius:19px;box-shadow:0 28px 90px rgba(0,0,0,.14);padding:28px 26px;animation:pop .2s ease}
@@ -152,13 +141,6 @@ html.desktop-shell .top-add{right:158px}
 .auth-error{color:#e4362c;font-size:12px;margin:10px 0 0;text-align:center}
 .auth-allowlist{display:block;width:100%;margin:14px 0 0!important;color:#8a8a8f!important;font-size:12px!important;text-align:center}
 .auth-waiting p{text-align:center;color:#8a8a8f;font-size:13px;margin:6px 0 0}
-
-@media(max-width:900px){
-  html.desktop-shell .topbar{height:92px;padding:40px 98px 0 55px;align-items:center}
-  html.desktop-shell .mobile-menu{top:49px}
-  html.desktop-shell .notification-button{top:49px;right:54px}
-  html.desktop-shell .top-add{top:49px;right:14px}
-}
 
 /* iPhone/Safari geometry: prevent fixed-size circular controls from shrinking. */
 .top-add,.notification-button,.icon-primary,.check,.progress-ring,.avatar,.color-picker button{aspect-ratio:1;flex:0 0 auto;padding:0}

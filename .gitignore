@@ -1,7 +1,9 @@
 node_modules/
 dist/
+.DS_Store
+
+# 残留的旧桌面端打包产物（待物理删除）
+release/
 JetKFlow-Desktop/
 JetKFlow-Windows/
-release/
 *.exe
-.DS_Store

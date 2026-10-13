@@ -1,9 +1,2 @@
 packages:
   - .
-
-allowBuilds:
-  electron-winstaller: true
-
-onlyBuiltDependencies:
-  - electron
-  - electron-winstaller
