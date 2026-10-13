@@ -17,8 +17,6 @@ const iso = (day, month = m, year = y) => `${year}-${pad(month + 1)}-${pad(day)}
 const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const todayKey = dateKey(now)
 const ALLOWED_EMAIL = 'zjyeoe@njust.edu.cn'
-const ALLOWED_PASSWORD = '19971011'
-const AUTH_DENIED_MESSAGE = '禁止注册/登录，请联系管理员。'
 const normalizeEmail = value => String(value || '').trim().toLowerCase()
 const isAllowedEmail = value => normalizeEmail(value) === ALLOWED_EMAIL
 
@@ -206,13 +204,41 @@ function AddListModal({ onClose, onAdd }) {
   </Modal>
 }
 
+function ChangePasswordModal({ onClose }) {
+  const [pw1, setPw1] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const save = async () => {
+    if (pw1.length < 8) { setError('密码至少 8 位'); return }
+    if (pw1 !== pw2) { setError('两次输入的密码不一致'); return }
+    setBusy(true); setError('')
+    const { error: err } = await cloud.auth.updateUser({ password: pw1 })
+    setBusy(false)
+    if (err) { setError(err.message); return }
+    onClose(true)
+  }
+  return <Modal title="修改密码" onClose={() => onClose(false)} onSave={save} saveLabel={busy ? '保存中…' : '保存'}>
+    <label className="field"><span>新密码</span><input type="password" autoFocus value={pw1} onChange={e=>setPw1(e.target.value)} placeholder="至少 8 位"/></label>
+    <label className="field"><span>确认新密码</span><input type="password" value={pw2} onChange={e=>setPw2(e.target.value)} onKeyDown={e=>e.key==='Enter'&&save()}/></label>
+    {error && <p className="auth-error" role="alert">{error}</p>}
+    <p className="auth-allowlist">新密码只保存在 Supabase 服务器端，不会写入代码</p>
+  </Modal>
+}
+
 function SettingsPanel({ settings, setSettings, notificationPermission, enableNotifications, session, onSignOut, onClose }) {
   const patch = value => setSettings(current => ({...current,...value}))
+  const [showPw, setShowPw] = useState(false)
+  const [pwChanged, setPwChanged] = useState(false)
   return <Modal title="JetKFlow 设置" onClose={onClose} onSave={onClose} saveLabel="完成">
     <div className="settings-group"><h3>通用</h3><label className="setting-row"><span><b>启动时打开</b><small>选择默认显示的页面</small></span><select value={settings.startPage} onChange={e=>patch({startPage:e.target.value})}><option value="home">今天概览</option><option value="reminders">提醒事项</option><option value="calendar">日历</option><option value="notes">便笺</option></select></label><label className="setting-row"><span><b>紧凑布局</b><small>在屏幕中显示更多内容</small></span><input type="checkbox" checked={settings.compact} onChange={e=>patch({compact:e.target.checked})}/></label></div>
-    <div className="settings-group"><h3>云同步</h3>{session ? <div className="setting-row"><span><b>{session.user?.email || '已登录'}</b><small>提醒、日历与便笺通过 Supabase 在设备间同步</small></span><button className="setting-button" onClick={onSignOut}>退出登录</button></div> : <div className="setting-row"><span><b>未登录</b><small>当前为本地模式，数据仅保存在此设备</small></span><em className="status-badge gray">本地</em></div>}</div><div className="settings-group"><h3>提醒</h3><div className="setting-row"><span><b>Windows 桌面通知</b><small>{notificationPermission==='granted'?'已允许通知':notificationPermission==='denied'?'已在系统中关闭':'到时间后显示系统提醒'}</small></span><button className="setting-button" onClick={enableNotifications}>{notificationPermission==='granted'?'已开启':'开启'}</button></div></div>
+    <div className="settings-group"><h3>云同步</h3>{session ? <>
+      <div className="setting-row"><span><b>{session.user?.email || '已登录'}</b><small>提醒、日历与便笺通过 Supabase 在设备间同步</small></span><button className="setting-button" onClick={onSignOut}>退出登录</button></div>
+      <div className="setting-row"><span><b>修改密码</b><small>{pwChanged ? '密码已更新，下次登录起生效' : '密码仅保存在服务器端，代码中不可见'}</small></span><button className="setting-button" onClick={()=>setShowPw(true)}>修改</button></div>
+    </> : <div className="setting-row"><span><b>未登录</b><small>当前为本地模式，数据仅保存在此设备</small></span><em className="status-badge gray">本地</em></div>}</div><div className="settings-group"><h3>提醒</h3><div className="setting-row"><span><b>Windows 桌面通知</b><small>{notificationPermission==='granted'?'已允许通知':notificationPermission==='denied'?'已在系统中关闭':'到时间后显示系统提醒'}</small></span><button className="setting-button" onClick={enableNotifications}>{notificationPermission==='granted'?'已开启':'开启'}</button></div></div>
     <div className="settings-group"><h3>数据与隐私</h3><div className="setting-row"><span><b>本地数据</b><small>提醒事项、日历和便笺仅保存在此设备</small></span><em className="status-badge">已启用</em></div><div className="setting-row"><span><b>附件与上传</b><small>JetKFlow 不提供文件上传功能</small></span><em className="status-badge gray">已禁用</em></div></div>
-    <p className="settings-version">JetKFlow for Windows · Preview 0.2</p>
+    <p className="settings-version">JetKFlow Web · 0.2</p>
+    {showPw && <ChangePasswordModal onClose={ok=>{setShowPw(false); if(ok) setPwChanged(true)}}/>}
   </Modal>
 }
 
@@ -467,42 +493,29 @@ function BottomNav({ active, onNavigate }) {
 }
 
 function LoginScreen({ initialError = '' }) {
-  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(initialError)
   useEffect(() => { if (initialError) setError(initialError) }, [initialError])
   const submit = async () => {
-    // 邮箱与密码必须与预设的账号完全一致，其余一律拒绝（注册与登录同一入口）
-    if (!isAllowedEmail(email) || password !== ALLOWED_PASSWORD) { setError(AUTH_DENIED_MESSAGE); return }
+    // 个人专用：邮箱固定写在代码里（非机密），密码只存在于 Supabase 服务器端。
+    if (!password) { setError('请输入密码'); return }
     setBusy(true); setError('')
-    let { data, error: err } = await cloud.auth.signInWithPassword({ email: ALLOWED_EMAIL, password: ALLOWED_PASSWORD })
-    if (err) {
-      // 账号还没创建过：用预设凭据注册（项目已关闭邮箱验证，注册即登录）
-      const registered = await cloud.auth.signUp({ email: ALLOWED_EMAIL, password: ALLOWED_PASSWORD })
-      if (registered.error) {
-        setBusy(false)
-        setError(registered.error.message === 'User already registered'
-          ? '账号已存在但密码不匹配：请在 Supabase 控制台 Authentication → Users 中删除该用户后重试'
-          : registered.error.message)
-        return
-      }
-      data = registered.data
-    }
+    const { data, error: err } = await cloud.auth.signInWithPassword({ email: ALLOWED_EMAIL, password })
     setBusy(false)
+    if (err) { setError(err.message === 'Invalid login credentials' ? '密码错误，请重试' : err.message); return }
     if (!data?.session) setError('登录未生效，请稍后重试')
   }
   return <div className="auth-backdrop"><div className="auth-card">
     <div className="auth-mark"><Check/></div>
-    <h2>JetKFlow 云同步</h2>
-    <p>登录后，提醒、日历与便笺在所有设备上保持一致</p>
-    <label className="field"><span>邮箱</span><input type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="请输入邮箱" onKeyDown={e => e.key === 'Enter' && submit()}/></label>
-    <label className="field"><span>密码</span><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" onKeyDown={e => e.key === 'Enter' && submit()}/></label>
+    <h2>JetKFlow</h2>
+    <p>输入密码，同步你的提醒、日历与便笺</p>
+    <label className="field"><span>密码</span><input type="password" autoFocus value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" onKeyDown={e => e.key === 'Enter' && submit()}/></label>
     <div className="auth-actions">
       <button className="auth-primary" disabled={busy} onClick={submit}>{busy ? '正在登录…' : '登录'}</button>
     </div>
     {error && <p className="auth-error" role="alert" aria-live="polite">{error}</p>}
-    <p className="auth-allowlist">仅授权账号可访问</p>
+    <p className="auth-allowlist">个人专用 · 密码仅保存在服务器端</p>
   </div></div>
 }
 
