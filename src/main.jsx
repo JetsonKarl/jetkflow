@@ -38,9 +38,9 @@ const seedEvents = [
 ]
 
 const seedNotes = [
-  { id: 'n1', title: '本周思考', content: '把时间留给真正重要的事。\n\n今天完成 @准备季度复盘材料，然后梳理产品体验。', updated: '刚刚', pinned: true, folder: '便笺' },
-  { id: 'n2', title: '产品灵感', content: '让日程、提醒与想法不再散落。\n\n@产品周会 之后整理团队反馈。', updated: '昨天', pinned: false, folder: '工作' },
-  { id: 'n3', title: '周末清单', content: '买鲜花、整理书架、去公园走走。', updated: '周三', pinned: false, folder: '个人' },
+  { id: 'n1', title: '本周思考', content: '把时间留给真正重要的事。\n\n今天完成 @准备季度复盘材料，然后梳理产品体验。', updated: '刚刚', pinned: true, folder: '便笺', color: '#f0b90b' },
+  { id: 'n2', title: '产品灵感', content: '让日程、提醒与想法不再散落。\n\n@产品周会 之后整理团队反馈。', updated: '昨天', pinned: false, folder: '工作', color: '#0a84ff' },
+  { id: 'n3', title: '周末清单', content: '买鲜花、整理书架、去公园走走。', updated: '周三', pinned: false, folder: '个人', color: '#34c759' },
 ]
 
 const defaultLists = [
@@ -78,8 +78,8 @@ const cloudTables = {
   },
   notes: {
     table: 'notes',
-    toRow: n => ({ id: n.id, title: n.title, content: n.content || '', content_html: n.contentHtml || null, folder: n.folder || '便笺', pinned: !!n.pinned, updated: n.updated || '刚刚' }),
-    fromRow: row => ({ id: row.id, title: row.title, content: row.content || '', contentHtml: row.content_html, folder: row.folder || '便笺', pinned: !!row.pinned, updated: row.updated || '刚刚' }),
+    toRow: n => ({ id: n.id, title: n.title, content: n.content || '', content_html: n.contentHtml || null, folder: n.folder || '便笺', pinned: !!n.pinned, color: n.color || '#f0b90b', updated: n.updated || '刚刚' }),
+    fromRow: row => ({ id: row.id, title: row.title, content: row.content || '', contentHtml: row.content_html, folder: row.folder || '便笺', pinned: !!row.pinned, color: row.color || '#f0b90b', updated: row.updated || '刚刚' }),
   },
   lists: {
     table: 'lists',
@@ -300,7 +300,7 @@ function Home({ reminders, events, notes, navigate, toggleReminder }) {
     </section>
     <div className="home-grid">
       <section className="panel"><div className="panel-title"><span><CheckCircle2 className="blue"/>今天的提醒</span><button onClick={() => navigate('reminders')}>查看全部 <ChevronRight/></button></div><div className="compact-list">{todayReminders.map(r => <div className="compact-row" key={r.id}><button className="check" style={{borderColor:r.color}} onClick={() => toggleReminder(r.id)} aria-label="完成提醒"><Check/></button><div><b>{r.title}</b><small>{r.time} · {r.list}</small></div>{r.priority && <Flag className="flag"/>}</div>)}</div></section>
-      <section className="panel"><div className="panel-title"><span><FileText className="yellow"/>最近便笺</span><button onClick={() => navigate('notes')}>查看全部 <ChevronRight/></button></div><div className="note-peek-grid">{notes.slice(0,2).map(n => <button className="note-peek" key={n.id} onClick={() => navigate('notes', n.id)}><b>{n.title}</b><p>{n.content}</p><small>{n.updated}</small></button>)}</div></section>
+      <section className="panel"><div className="panel-title"><span><FileText className="yellow"/>最近便笺</span><button onClick={() => navigate('notes')}>查看全部 <ChevronRight/></button></div><div className="note-peek-grid">{notes.slice(0,2).map(n => <button className="note-peek" key={n.id} style={{'--note-color':n.color||'#f0b90b'}} onClick={() => navigate('notes', n.id)}><i className="note-color-bar"/><b>{n.title}</b><p>{n.content}</p><small>{n.updated}</small></button>)}</div></section>
     </div>
   </main>
 }
@@ -389,9 +389,19 @@ function NotesView({ notes, setNotes, selectedNote, setSelectedNote, reminders, 
   const [noteQuery, setNoteQuery] = useState('')
   const [draftLength, setDraftLength] = useState(note?.content.length || 0)
   const [mobileEditorOpen, setMobileEditorOpen] = useState(false)
+  const [folderFilter, setFolderFilter] = useState('全部')
+  const [menuOpen, setMenuOpen] = useState(false)
   const links = [...reminders.map(r => ({id:r.id, title:r.title, type:'提醒事项', icon:CheckCircle2})), ...events.map(e => ({id:e.id, title:e.title, type:'日历', icon:CalendarDays}))].filter(x => x.title.includes(mentionQuery)).slice(0,6)
   const update = patch => setNotes(items => items.map(n => n.id === note.id ? {...n, ...patch, updated:'刚刚'} : n))
   const visibleNotes = notes.filter(n => (n.title+n.content).toLowerCase().includes(noteQuery.toLowerCase()))
+  const folders = [...new Set(['便笺', ...notes.map(n => n.folder || '便笺')])]
+  const noteColors = ['#f0b90b','#0a84ff','#34c759','#ff6482','#bf5af2','#8e8e93']
+  const sortedNotes = [...visibleNotes.filter(n => folderFilter==='全部' || (n.folder||'便笺')===folderFilter)].sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0))
+  const togglePin = () => { update({pinned:!note.pinned}); setMenuOpen(false) }
+  const setNoteColor = color => update({color})
+  const moveToFolder = folder => { update({folder}); setMenuOpen(false) }
+  const createFolder = () => { const name = window.prompt('新建文件夹名称'); if (name && name.trim()) moveToFolder(name.trim()) }
+  const deleteNote = () => { if (!window.confirm(`删除便笺「${note.title}」？此操作不可恢复。`)) return; setNotes(items => items.filter(n => n.id !== note.id)); setMenuOpen(false); setMobileEditorOpen(false) }
   const initialHtml = current => current.contentHtml || current.content.split('\n').map(line=>`<div>${line || '<br>'}</div>`).join('')
   const commitDraft = () => {
     clearTimeout(saveTimerRef.current)
@@ -408,7 +418,7 @@ function NotesView({ notes, setNotes, selectedNote, setSelectedNote, reminders, 
     const html = initialHtml(note)
     editorRef.current.innerHTML = html
     draftHtmlRef.current = html; draftTextRef.current = note.content
-    setDraftLength(note.content.length); setMentionOpen(false)
+    setDraftLength(note.content.length); setMentionOpen(false); setMenuOpen(false)
     return () => { clearTimeout(saveTimerRef.current) }
   }, [note?.id])
   useEffect(() => () => { clearTimeout(saveTimerRef.current) }, [])
@@ -450,9 +460,9 @@ function NotesView({ notes, setNotes, selectedNote, setSelectedNote, reminders, 
     onContent({currentTarget:editorRef.current}); setMentionOpen(false)
   }
   if (!note) return null
-  return <main className="content notes-view"><header className="page-heading compact"><div><span className="eyebrow">便笺</span><h1>所有便笺</h1></div><button className="round-action yellow-action" onClick={() => openAdd('note')}><PenLine/>新便笺</button></header>
-    <div className={`notes-layout ${mobileEditorOpen?'mobile-editor-open':''}`}><section className="notes-list"><div className="notes-search"><Search/><input value={noteQuery} onChange={e=>setNoteQuery(e.target.value)} placeholder="搜索便笺" /></div><div className="note-cards">{visibleNotes.map(n => <button key={n.id} className={`note-list-item ${note.id===n.id?'active':''}`} onClick={() => {commitDraft();setSelectedNote(n.id);setMobileEditorOpen(true)}}>{n.pinned && <Pin/>}<b>{n.title}</b><p>{n.content.replace(/\n/g,' ')}</p><small>{n.updated} · {n.folder}</small></button>)}</div></section>
-    <section className="note-editor"><button className="mobile-note-back" onClick={()=>{commitDraft();setMobileEditorOpen(false)}}><ChevronLeft/>所有便笺</button><div className="editor-toolbar"><div className="format-tools"><select aria-label="字号" defaultValue="3" onChange={e=>format('fontSize',e.target.value)}><option value="2">小号</option><option value="3">正文</option><option value="4">大号</option><option value="5">标题</option></select><button title="加粗" onMouseDown={e=>{e.preventDefault();format('bold')}}><Bold/></button><button title="斜体" onMouseDown={e=>{e.preventDefault();format('italic')}}><Italic/></button><button title="下划线" onMouseDown={e=>{e.preventDefault();format('underline')}}><Underline/></button><button title="项目符号" onMouseDown={e=>{e.preventDefault();format('insertUnorderedList')}}><List/></button><button title="编号列表" onMouseDown={e=>{e.preventDefault();format('insertOrderedList')}}><ListOrdered/></button><button title="检查清单" onMouseDown={e=>{e.preventDefault();format('insertText','☐ ')}}><CheckCircle2/></button><button title="标签" onMouseDown={e=>{e.preventDefault();format('insertText','#')}}><Tag/></button></div><button title="更多"><MoreHorizontal/></button></div><div className="editor-meta"><input value={note.title} onChange={e => update({title:e.target.value})}/><span>{note.updated} · {draftLength} 个字</span></div><div className="editor-wrap"><div key={note.id} ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={onContent} onKeyUp={updateMention} onClick={updateMention} onBlur={()=>{setMentionOpen(false);commitDraft()}} data-placeholder="开始记录…" />{mentionOpen && <div className="mention-menu"><div className="mention-title"><span>@</span>链接到</div>{links.map(item => { const Icon=item.icon; return <button key={item.type+item.id} onMouseDown={e=>{e.preventDefault();insertMention(item.title)}}><i className={item.type==='日历'?'pink-bg':'blue-bg'}><Icon/></i><span><b>{item.title}</b><small>{item.type}</small></span><Plus/></button>})}</div>}</div><div className="editor-hint"><Command/> 输入 <b>@</b> 可链接提醒事项或日历 · 内容自动保存在本机</div></section></div>
+  return <main className="content notes-view"><header className="page-heading compact"><div><span className="eyebrow">便笺</span><h1>{folderFilter==='全部'?'所有便笺':folderFilter}</h1></div><button className="round-action yellow-action" onClick={() => openAdd('note')}><PenLine/>新便笺</button></header>
+    <div className={`notes-layout ${mobileEditorOpen?'mobile-editor-open':''}`}><section className="notes-list"><div className="folder-chips">{['全部',...folders].map(f => <button key={f} className={folderFilter===f?'active':''} onClick={()=>setFolderFilter(f)}>{f}</button>)}</div><div className="notes-search"><Search/><input value={noteQuery} onChange={e=>setNoteQuery(e.target.value)} placeholder="搜索便笺" /></div><div className="note-cards">{sortedNotes.map(n => <button key={n.id} className={`note-list-item ${note.id===n.id?'active':''}`} style={{'--note-color':n.color||'#f0b90b'}} onClick={() => {commitDraft();setSelectedNote(n.id);setMobileEditorOpen(true)}}><i className="note-color-bar"/>{n.pinned && <Pin/>}<b>{n.title}</b><p>{n.content.replace(/\n/g,' ')}</p><small>{n.updated} · {n.folder}</small></button>)}{!sortedNotes.length && <div className="notes-empty"><FileText/><p>没有匹配的便笺</p></div>}</div></section>
+    <section className="note-editor"><div className="note-color-strip" style={{background:note.color||'#f0b90b'}}/><button className="mobile-note-back" onClick={()=>{commitDraft();setMobileEditorOpen(false)}}><ChevronLeft/>所有便笺</button><div className="editor-toolbar"><div className="format-tools"><select aria-label="字号" defaultValue="3" onChange={e=>format('fontSize',e.target.value)}><option value="2">小号</option><option value="3">正文</option><option value="4">大号</option><option value="5">标题</option></select><button title="加粗" onMouseDown={e=>{e.preventDefault();format('bold')}}><Bold/></button><button title="斜体" onMouseDown={e=>{e.preventDefault();format('italic')}}><Italic/></button><button title="下划线" onMouseDown={e=>{e.preventDefault();format('underline')}}><Underline/></button><button title="项目符号" onMouseDown={e=>{e.preventDefault();format('insertUnorderedList')}}><List/></button><button title="编号列表" onMouseDown={e=>{e.preventDefault();format('insertOrderedList')}}><ListOrdered/></button><button title="检查清单" onMouseDown={e=>{e.preventDefault();format('insertText','☐ ')}}><CheckCircle2/></button><button title="标签" onMouseDown={e=>{e.preventDefault();format('insertText','#')}}><Tag/></button></div><div className="editor-more"><button title="更多" className={menuOpen?'active':''} onClick={()=>setMenuOpen(v=>!v)}><MoreHorizontal/></button>{menuOpen && <><button className="menu-scrim" aria-label="关闭菜单" onClick={()=>setMenuOpen(false)}/><div className="more-menu"><button onClick={togglePin}><Pin/>{note.pinned?'取消置顶':'置顶便笺'}</button><div className="more-colors"><span>便笺颜色</span><div>{noteColors.map(c => <button key={c} className={(note.color||'#f0b90b')===c?'selected':''} style={{background:c}} onClick={()=>setNoteColor(c)} aria-label={`颜色 ${c}`}><Check/></button>)}</div></div><div className="more-folders"><span>移动到文件夹</span>{folders.map(f => <button key={f} className={(note.folder||'便笺')===f?'current':''} onClick={()=>moveToFolder(f)}>{f}</button>)}<button onClick={createFolder}>＋ 新建文件夹</button></div><button className="danger" onClick={deleteNote}><Trash2/>删除便笺</button></div></>}</div></div><div className="editor-meta"><input value={note.title} onChange={e => update({title:e.target.value})}/><span>{note.updated} · {draftLength} 个字 · {note.folder||'便笺'}</span></div><div className="editor-wrap"><div key={note.id} ref={editorRef} className="rich-editor" contentEditable suppressContentEditableWarning onInput={onContent} onKeyUp={updateMention} onClick={updateMention} onBlur={()=>{setMentionOpen(false);commitDraft()}} data-placeholder="开始记录…" />{mentionOpen && <div className="mention-menu"><div className="mention-title"><span>@</span>链接到</div>{links.map(item => { const Icon=item.icon; return <button key={item.type+item.id} onMouseDown={e=>{e.preventDefault();insertMention(item.title)}}><i className={item.type==='日历'?'pink-bg':'blue-bg'}><Icon/></i><span><b>{item.title}</b><small>{item.type}</small></span><Plus/></button>})}</div>}</div><div className="editor-hint"><Command/> 输入 <b>@</b> 可链接提醒事项或日历 · 内容自动保存</div></section></div>
   </main>
 }
 
@@ -593,7 +603,7 @@ function App() {
     if (data.sync) { reminderId=crypto.randomUUID(); addReminder({id:reminderId,title:data.title,date:data.date,time:data.start,notes:'从日历同步'}) }
     setEvents(es => [...es, {id,title:data.title,date:data.date,start:data.start,end:data.end,calendar:'个人',color:'#0a84ff',location:'',reminderId}])
   }
-  const addNote = data => { const id=crypto.randomUUID(); setNotes(ns => [{id,updated:'刚刚',pinned:false,folder:'便笺',...data},...ns]); setSelectedNote(id); setActive('notes') }
+  const addNote = data => { const id=crypto.randomUUID(); setNotes(ns => [{id,updated:'刚刚',pinned:false,folder:'便笺',color:'#f0b90b',...data},...ns]); setSelectedNote(id); setActive('notes') }
   const enableNotifications = async () => {
     if (typeof Notification === 'undefined') return
     const result = await Notification.requestPermission()
