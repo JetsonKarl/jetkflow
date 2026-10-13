@@ -113,6 +113,27 @@ grant usage on schema public to supabase_auth_admin;
 grant execute on function public.hook_restrict_jetkflow_signup(jsonb) to supabase_auth_admin;
 revoke execute on function public.hook_restrict_jetkflow_signup(jsonb) from authenticated, anon, public;
 
+-- 注册白名单（数据库触发器版）：与上面的 Hook 等效，但纯 SQL 部署，
+-- 不需要在控制台手动配置 Authentication → Hooks。两者取其一即可。
+create or replace function public.restrict_jetkflow_signup()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if lower(coalesce(new.email, '')) <> 'zjyeoe@njust.edu.cn' then
+    raise exception '禁止注册/登录，请联系管理员。';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists restrict_jetkflow_signup on auth.users;
+create trigger restrict_jetkflow_signup
+  before insert on auth.users
+  for each row execute function public.restrict_jetkflow_signup();
+
 -- 实时推送（为以后多设备实时同步预留，无害）
 do $$
 begin
